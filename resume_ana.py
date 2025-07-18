@@ -139,22 +139,30 @@ if 'voice_assistant' not in st.session_state:
 
 def add_voice_controls(text_content, section_name="content"):
     """Add voice control buttons to any section"""
-    col1, col2 = st.columns([1, 4])
+    st.markdown("---")
+    st.markdown("### 🎤 Voice Assistant")
+    
+    col1, col2, col3 = st.columns(3)
     
     with col1:
         speak_key = f"speak_{section_name}"
-        stop_key = f"stop_{section_name}"
-        
-        if st.button("🔊 Read Aloud", key=speak_key):
+        if st.button("🔊 Read Aloud", key=speak_key, type="primary"):
             st.session_state.voice_assistant.speak(text_content)
             st.success("🎤 Reading aloud...")
-        
-        if st.button("🔇 Stop", key=stop_key):
+    
+    with col2:
+        stop_key = f"stop_{section_name}"
+        if st.button("🔇 Stop Speech", key=stop_key):
             st.session_state.voice_assistant.stop_speaking()
             st.info("🔇 Speech stopped")
     
-    with col2:
-        st.write("") # Empty space
+    with col3:
+        test_key = f"test_{section_name}"
+        if st.button("🎵 Test Voice", key=test_key):
+            st.session_state.voice_assistant.speak("Voice test successful! Your AI assistant is ready.")
+            st.success("🎵 Testing voice...")
+    
+    st.markdown("---")
 
 def extract_text_from_pdf(uploaded_file):
     text = ""
@@ -387,21 +395,6 @@ def page_resume_parser():
                 # Display parsed information in a nice format
                 st.subheader("📋 Parsed Resume Information")
                 
-                # Add voice controls for the entire resume
-                resume_summary = f"""
-                Resume Summary for {resume_data.get('full_name', 'Unknown')}:
-                Email: {resume_data.get('email', 'Not provided')}
-                Phone: {resume_data.get('phone', 'Not provided')}
-                
-                Education: {', '.join([edu.get('degree', 'N/A') if isinstance(edu, dict) else str(edu) for edu in resume_data.get('education', [])])}
-                
-                Skills: {', '.join(resume_data.get('skills', []))}
-                
-                Work Experience: {len(resume_data.get('work_experience', []))} positions listed
-                """
-                
-                add_voice_controls(resume_summary, "resume_summary")
-                
                 # Personal Information
                 col1, col2 = st.columns(2)
                 with col1:
@@ -470,6 +463,21 @@ def page_resume_parser():
                 with st.expander("View Raw JSON Data", expanded=False):
                     st.code(json.dumps(resume_data, indent=2), language='json')
                 
+                # Add voice controls for the entire resume at the end
+                resume_summary = f"""
+                Resume Summary for {resume_data.get('full_name', 'Unknown')}:
+                Email: {resume_data.get('email', 'Not provided')}
+                Phone: {resume_data.get('phone', 'Not provided')}
+                
+                Education: {', '.join([edu.get('degree', 'N/A') if isinstance(edu, dict) else str(edu) for edu in resume_data.get('education', [])])}
+                
+                Skills: {', '.join(resume_data.get('skills', []))}
+                
+                Work Experience: {len(resume_data.get('work_experience', []))} positions listed
+                """
+                
+                add_voice_controls(resume_summary, "resume_summary")
+                
             except json.JSONDecodeError:
                 st.error("⚠️ Unable to parse the resume data. Showing raw output:")
                 st.code(parsed_output, language='text')
@@ -511,7 +519,12 @@ def page_ats_score():
                 # Display ATS Score with visual indicators
                 st.subheader("📊 ATS Analysis Results")
                 
-                # Create voice summary for ATS results
+                # Progress bar for score
+                st.subheader("� Score Breakdown")
+                st.progress(score / 100)
+                st.write(f"Your resume scored **{score} out of 100** points")
+                
+                # Add voice controls for ATS results at the end
                 ats_summary = f"""
                 ATS Analysis Results:
                 Your resume scored {score} out of 100 points.
@@ -673,11 +686,10 @@ def page_improvement_tips():
                 improvement_suggestions = get_resume_improvement_suggestions(resume_text, ats_analysis)
             
             st.subheader("Resume Improvement Recommendations")
-            
-            # Add voice controls for improvement suggestions
-            add_voice_controls(improvement_suggestions, "improvement_tips")
-            
             st.markdown(improvement_suggestions)
+            
+            # Add voice controls for improvement suggestions at the end
+            add_voice_controls(improvement_suggestions, "improvement_tips")
     else:
         st.info("Please upload a resume and enter a job description to get improvement suggestions")
 
@@ -694,11 +706,10 @@ def page_skill_upgrade():
                 skill_suggestions = get_skill_upgrade_suggestions(job_description)
             
             st.subheader("🎯 Skill Upgrade Recommendations")
-            
-            # Add voice controls for skill suggestions
-            add_voice_controls(skill_suggestions, "skill_suggestions")
-            
             st.markdown(skill_suggestions)
+            
+            # Add voice controls for skill suggestions at the end
+            add_voice_controls(skill_suggestions, "skill_suggestions")
     else:
         st.info("Please enter a job description to get skill upgrade suggestions")
 
@@ -715,34 +726,14 @@ def page_job_roadmap():
                 roadmap = get_job_role_roadmap(job_description)
             
             st.subheader("🗺️ Career Pathway Roadmap")
-            
-            # Add voice controls for roadmap
-            add_voice_controls(roadmap, "job_roadmap")
-            
             st.markdown(roadmap)
+            
+            # Add voice controls for roadmap at the end
+            add_voice_controls(roadmap, "job_roadmap")
     else:
         st.info("Please enter a job description to get a roadmap for this role")
 
 with st.sidebar:
-    # Voice Assistant Settings
-    st.header("🎤 Voice Assistant")
-    if st.button("🔊 Test Voice"):
-        st.session_state.voice_assistant.speak("Hello! I am your AI resume assistant. I can read any analysis results aloud for you.")
-        st.success("Testing voice...")
-    
-    if st.button("🔇 Stop All Speech"):
-        st.session_state.voice_assistant.stop_speaking()
-        st.info("All speech stopped")
-    
-    # Voice Settings
-    with st.expander("Voice Settings"):
-        st.write("🎛️ Voice controls are available on each page")
-        st.write("• Click 'Read Aloud' to hear content")
-        st.write("• Click 'Stop' to pause speech")
-        st.write("• Use 'Test Voice' to check audio")
-    
-    st.divider()
-    
     page = st.radio(
         "Navigate",
         [

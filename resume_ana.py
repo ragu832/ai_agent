@@ -329,38 +329,9 @@ def get_score_color_and_icon(score):
     elif score >= 70:
         return "🟠", "#fd7e14"
     elif score >= 60:
-        return "🔴", "#dc3545"
+        return "🔴", "#0026ff"
     else:
         return "🔴", "#dc3545"
-
-def sidebar_info():
-    st.header("How to Use")
-    st.markdown("""
-    Step 1: Upload your resume in PDF format
-    
-    Step 2: Paste the job description you're targeting
-    
-    Step 3: Analyze your resume:
-    - Parse Resume: Extract structured data
-    - ATS Score: Get compatibility score (0-100)
-    - Improvement Tips: Get actionable advice
-    """)
-    st.header("ATS Score Guide")
-    st.markdown("""
-    - 90-100: Excellent match
-    - 80-89: Good match  
-    - 70-79: Fair match
-    - 60-69: Below average
-    - <60: Poor match
-    """)
-    st.header("Quick Tips")
-    st.markdown("""
-    Use keywords from job description  
-    Quantify your achievements  
-    Include relevant technical skills  
-    Use standard section headings  
-    Keep formatting simple and clean
-    """)
 
 def page_resume_parser():
     st.title("Resume Parser")

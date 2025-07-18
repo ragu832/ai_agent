@@ -2,3 +2,5 @@ streamlit
 pdfplumber
 openai
 python-dotenv
+pyttsx3
+streamlit-audio-recorder

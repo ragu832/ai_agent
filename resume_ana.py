@@ -3,6 +3,11 @@ import pdfplumber
 from openai import OpenAI
 import os
 import json
+import pyttsx3
+import threading
+import time
+import tempfile
+import base64
 
 st.set_page_config(
     page_title="AI Resume Parser & ATS Analyzer", 
@@ -43,6 +48,113 @@ client = OpenAI(
     api_key=GROQ_API_KEY,
     base_url="https://api.groq.com/openai/v1",
 )
+
+# Voice Assistant Class
+class VoiceAssistant:
+    def __init__(self):
+        self.engine = None
+        self.is_speaking = False
+        self.init_engine()
+    
+    def init_engine(self):
+        """Initialize the TTS engine"""
+        try:
+            self.engine = pyttsx3.init()
+            # Set properties
+            self.engine.setProperty('rate', 150)  # Speed of speech
+            self.engine.setProperty('volume', 0.8)  # Volume level (0.0 to 1.0)
+            
+            # Try to set a nice voice
+            voices = self.engine.getProperty('voices')
+            if voices:
+                # Try to find a female voice or use the first available
+                for voice in voices:
+                    if 'female' in voice.name.lower() or 'zira' in voice.name.lower():
+                        self.engine.setProperty('voice', voice.id)
+                        break
+                else:
+                    self.engine.setProperty('voice', voices[0].id)
+        except Exception as e:
+            st.error(f"Voice engine initialization failed: {str(e)}")
+            self.engine = None
+    
+    def speak(self, text):
+        """Speak the given text"""
+        if not self.engine:
+            st.error("Voice engine not available")
+            return
+        
+        # Clean the text for better speech
+        clean_text = self.clean_text_for_speech(text)
+        
+        def speak_thread():
+            try:
+                self.is_speaking = True
+                self.engine.say(clean_text)
+                self.engine.runAndWait()
+                self.is_speaking = False
+            except Exception as e:
+                st.error(f"Speech error: {str(e)}")
+                self.is_speaking = False
+        
+        # Run in separate thread to avoid blocking
+        thread = threading.Thread(target=speak_thread)
+        thread.daemon = True
+        thread.start()
+    
+    def clean_text_for_speech(self, text):
+        """Clean text for better speech synthesis"""
+        # Remove markdown formatting
+        text = text.replace('**', '').replace('*', '')
+        text = text.replace('#', '').replace('```', '')
+        text = text.replace('•', '').replace('✓', 'check')
+        text = text.replace('✗', 'cross').replace('🟢', 'green')
+        text = text.replace('🟡', 'yellow').replace('🟠', 'orange')
+        text = text.replace('🔴', 'red').replace('📊', '').replace('📋', '')
+        text = text.replace('👤', '').replace('🎓', '').replace('💼', '')
+        text = text.replace('🛠️', '').replace('🏆', '').replace('🔍', '')
+        text = text.replace('✅', 'yes').replace('❌', 'no')
+        text = text.replace('🎯', '').replace('💡', '')
+        text = text.replace('📈', '').replace('🎉', '')
+        text = text.replace('⚠️', 'warning').replace('🔄', '')
+        text = text.replace('📚', '').replace('📍', '').replace('📅', '')
+        
+        # Remove extra whitespace
+        text = ' '.join(text.split())
+        
+        return text
+    
+    def stop_speaking(self):
+        """Stop current speech"""
+        if self.engine and self.is_speaking:
+            try:
+                self.engine.stop()
+                self.is_speaking = False
+            except Exception as e:
+                st.error(f"Error stopping speech: {str(e)}")
+
+# Initialize voice assistant
+if 'voice_assistant' not in st.session_state:
+    st.session_state.voice_assistant = VoiceAssistant()
+
+def add_voice_controls(text_content, section_name="content"):
+    """Add voice control buttons to any section"""
+    col1, col2 = st.columns([1, 4])
+    
+    with col1:
+        speak_key = f"speak_{section_name}"
+        stop_key = f"stop_{section_name}"
+        
+        if st.button("🔊 Read Aloud", key=speak_key):
+            st.session_state.voice_assistant.speak(text_content)
+            st.success("🎤 Reading aloud...")
+        
+        if st.button("🔇 Stop", key=stop_key):
+            st.session_state.voice_assistant.stop_speaking()
+            st.info("🔇 Speech stopped")
+    
+    with col2:
+        st.write("") # Empty space
 
 def extract_text_from_pdf(uploaded_file):
     text = ""
@@ -275,6 +387,21 @@ def page_resume_parser():
                 # Display parsed information in a nice format
                 st.subheader("📋 Parsed Resume Information")
                 
+                # Add voice controls for the entire resume
+                resume_summary = f"""
+                Resume Summary for {resume_data.get('full_name', 'Unknown')}:
+                Email: {resume_data.get('email', 'Not provided')}
+                Phone: {resume_data.get('phone', 'Not provided')}
+                
+                Education: {', '.join([edu.get('degree', 'N/A') if isinstance(edu, dict) else str(edu) for edu in resume_data.get('education', [])])}
+                
+                Skills: {', '.join(resume_data.get('skills', []))}
+                
+                Work Experience: {len(resume_data.get('work_experience', []))} positions listed
+                """
+                
+                add_voice_controls(resume_summary, "resume_summary")
+                
                 # Personal Information
                 col1, col2 = st.columns(2)
                 with col1:
@@ -383,6 +510,21 @@ def page_ats_score():
                 
                 # Display ATS Score with visual indicators
                 st.subheader("📊 ATS Analysis Results")
+                
+                # Create voice summary for ATS results
+                ats_summary = f"""
+                ATS Analysis Results:
+                Your resume scored {score} out of 100 points.
+                Category: {ats_data.get('score_category', 'Unknown')}
+                
+                Matched Keywords: {', '.join(ats_data.get('matched_keywords', []))}
+                
+                Missing Keywords: {', '.join(ats_data.get('missing_keywords', []))}
+                
+                Overall Assessment: {ats_data.get('overall_assessment', 'No assessment provided')}
+                """
+                
+                add_voice_controls(ats_summary, "ats_results")
                 
                 # Score display with color coding
                 col1, col2, col3 = st.columns(3)
@@ -529,7 +671,12 @@ def page_improvement_tips():
             with st.spinner("Generating improvement suggestions..."):
                 ats_analysis = calculate_ats_score(resume_text, job_description)
                 improvement_suggestions = get_resume_improvement_suggestions(resume_text, ats_analysis)
+            
             st.subheader("Resume Improvement Recommendations")
+            
+            # Add voice controls for improvement suggestions
+            add_voice_controls(improvement_suggestions, "improvement_tips")
+            
             st.markdown(improvement_suggestions)
     else:
         st.info("Please upload a resume and enter a job description to get improvement suggestions")
@@ -545,6 +692,12 @@ def page_skill_upgrade():
         if st.button("Get Skill Upgrade Suggestions"):
             with st.spinner("Analyzing job description for skill upgrade suggestions..."):
                 skill_suggestions = get_skill_upgrade_suggestions(job_description)
+            
+            st.subheader("🎯 Skill Upgrade Recommendations")
+            
+            # Add voice controls for skill suggestions
+            add_voice_controls(skill_suggestions, "skill_suggestions")
+            
             st.markdown(skill_suggestions)
     else:
         st.info("Please enter a job description to get skill upgrade suggestions")
@@ -560,11 +713,36 @@ def page_job_roadmap():
         if st.button("Get Job Role Roadmap"):
             with st.spinner("Generating career pathway for this job role..."):
                 roadmap = get_job_role_roadmap(job_description)
+            
+            st.subheader("🗺️ Career Pathway Roadmap")
+            
+            # Add voice controls for roadmap
+            add_voice_controls(roadmap, "job_roadmap")
+            
             st.markdown(roadmap)
     else:
         st.info("Please enter a job description to get a roadmap for this role")
 
 with st.sidebar:
+    # Voice Assistant Settings
+    st.header("🎤 Voice Assistant")
+    if st.button("🔊 Test Voice"):
+        st.session_state.voice_assistant.speak("Hello! I am your AI resume assistant. I can read any analysis results aloud for you.")
+        st.success("Testing voice...")
+    
+    if st.button("🔇 Stop All Speech"):
+        st.session_state.voice_assistant.stop_speaking()
+        st.info("All speech stopped")
+    
+    # Voice Settings
+    with st.expander("Voice Settings"):
+        st.write("🎛️ Voice controls are available on each page")
+        st.write("• Click 'Read Aloud' to hear content")
+        st.write("• Click 'Stop' to pause speech")
+        st.write("• Use 'Test Voice' to check audio")
+    
+    st.divider()
+    
     page = st.radio(
         "Navigate",
         [

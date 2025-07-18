@@ -63,7 +63,29 @@ You are a smart AI resume parser. Extract the following from the resume:
 - Skills
 - Certifications
 
-Return the result in JSON format.
+IMPORTANT: Return ONLY a valid JSON object with the following structure:
+{{
+    "full_name": "John Doe",
+    "email": "john.doe@email.com",
+    "phone": "+1-234-567-8900",
+    "education": [
+        {{
+            "degree": "Bachelor of Science in Computer Science",
+            "institution": "University Name",
+            "year": "2020"
+        }}
+    ],
+    "work_experience": [
+        {{
+            "job_title": "Software Engineer",
+            "company": "Company Name",
+            "duration": "2020-2023",
+            "responsibilities": ["Task 1", "Task 2"]
+        }}
+    ],
+    "skills": ["Python", "JavaScript", "React"],
+    "certifications": ["AWS Certified", "Google Cloud"]
+}}
 
 Resume:
 \"\"\"{resume_text}\"\"\"
@@ -93,16 +115,16 @@ Provide scoring criteria:
 - 60-69: Below average, significant improvements required
 - Below 60: Poor match, major changes needed
 
-Return the result in JSON format with the following structure:
+IMPORTANT: Return ONLY a valid JSON object with the following structure (no additional text or formatting):
 {{
-    "ats_score": <number>,
-    "score_category": "<Excellent/Good/Fair/Below Average/Poor>",
-    "matched_keywords": [<list of keywords>],
-    "missing_keywords": [<list of keywords>],
-    "skills_gap": [<list of missing skills>],
-    "experience_alignment": "<assessment>",
-    "overall_assessment": "<summary>",
-    "recommendations": [<list of improvement suggestions>]
+    "ats_score": 75,
+    "score_category": "Fair",
+    "matched_keywords": ["keyword1", "keyword2"],
+    "missing_keywords": ["keyword3", "keyword4"],
+    "skills_gap": ["skill1", "skill2"],
+    "experience_alignment": "Brief assessment text",
+    "overall_assessment": "Summary text",
+    "recommendations": ["suggestion1", "suggestion2"]
 }}
 
 Job Description:
@@ -232,8 +254,98 @@ def page_resume_parser():
         if st.button("Parse Resume"):
             with st.spinner("Parsing resume with Groq..."):
                 parsed_output = get_resume_details(resume_text)
-            st.subheader("Structured Resume Information")
-            st.code(parsed_output, language='json')
+            
+            # Try to parse JSON and display nicely
+            try:
+                # Clean up the response
+                clean_output = parsed_output.strip()
+                if "```json" in clean_output:
+                    start = clean_output.find("```json") + 7
+                    end = clean_output.find("```", start)
+                    if end != -1:
+                        clean_output = clean_output[start:end].strip()
+                elif "```" in clean_output:
+                    start = clean_output.find("```") + 3
+                    end = clean_output.find("```", start)
+                    if end != -1:
+                        clean_output = clean_output[start:end].strip()
+                
+                resume_data = json.loads(clean_output)
+                
+                # Display parsed information in a nice format
+                st.subheader("📋 Parsed Resume Information")
+                
+                # Personal Information
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.markdown("### 👤 Personal Information")
+                    if resume_data.get('full_name'):
+                        st.write(f"**Name:** {resume_data['full_name']}")
+                    if resume_data.get('email'):
+                        st.write(f"**Email:** {resume_data['email']}")
+                    if resume_data.get('phone'):
+                        st.write(f"**Phone:** {resume_data['phone']}")
+                
+                with col2:
+                    st.markdown("### 🎓 Education")
+                    education = resume_data.get('education', [])
+                    if education:
+                        for edu in education:
+                            if isinstance(edu, dict):
+                                st.write(f"**{edu.get('degree', 'N/A')}**")
+                                st.write(f"📍 {edu.get('institution', 'N/A')}")
+                                st.write(f"📅 {edu.get('year', 'N/A')}")
+                            else:
+                                st.write(f"• {edu}")
+                    else:
+                        st.write("No education information found")
+                
+                # Work Experience
+                st.markdown("### 💼 Work Experience")
+                work_exp = resume_data.get('work_experience', [])
+                if work_exp:
+                    for job in work_exp:
+                        if isinstance(job, dict):
+                            st.markdown(f"**{job.get('job_title', 'N/A')}** at {job.get('company', 'N/A')}")
+                            st.write(f"📅 {job.get('duration', 'N/A')}")
+                            responsibilities = job.get('responsibilities', [])
+                            if responsibilities:
+                                st.write("**Key Responsibilities:**")
+                                for resp in responsibilities:
+                                    st.write(f"• {resp}")
+                            st.write("---")
+                        else:
+                            st.write(f"• {job}")
+                else:
+                    st.write("No work experience found")
+                
+                # Skills and Certifications
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.markdown("### 🛠️ Skills")
+                    skills = resume_data.get('skills', [])
+                    if skills:
+                        skills_text = ", ".join(skills)
+                        st.write(skills_text)
+                    else:
+                        st.write("No skills found")
+                
+                with col2:
+                    st.markdown("### 🏆 Certifications")
+                    certifications = resume_data.get('certifications', [])
+                    if certifications:
+                        for cert in certifications:
+                            st.write(f"• {cert}")
+                    else:
+                        st.write("No certifications found")
+                
+                # Show raw JSON in expandable section
+                with st.expander("View Raw JSON Data", expanded=False):
+                    st.code(json.dumps(resume_data, indent=2), language='json')
+                
+            except json.JSONDecodeError:
+                st.error("⚠️ Unable to parse the resume data. Showing raw output:")
+                st.code(parsed_output, language='text')
 
 def page_ats_score():
     st.title("ATS Score Analyzer")
@@ -250,59 +362,155 @@ def page_ats_score():
             with st.spinner("Analyzing ATS compatibility..."):
                 ats_analysis = calculate_ats_score(resume_text, job_description)
             try:
-                ats_data = json.loads(ats_analysis)
+                # Try to extract JSON from the response if it's wrapped in text
+                ats_response = ats_analysis.strip()
+                
+                # Look for JSON content between ```json and ``` or just try direct parsing
+                if "```json" in ats_response:
+                    start = ats_response.find("```json") + 7
+                    end = ats_response.find("```", start)
+                    if end != -1:
+                        ats_response = ats_response[start:end].strip()
+                elif "```" in ats_response:
+                    start = ats_response.find("```") + 3
+                    end = ats_response.find("```", start)
+                    if end != -1:
+                        ats_response = ats_response[start:end].strip()
+                
+                # Try parsing JSON
+                ats_data = json.loads(ats_response)
                 score = ats_data.get('ats_score', 0)
-                icon, color = get_score_color_and_icon(score)
+                
+                # Display ATS Score with visual indicators
+                st.subheader("📊 ATS Analysis Results")
+                
+                # Score display with color coding
                 col1, col2, col3 = st.columns(3)
                 with col1:
-                    st.metric("ATS Score", f"{score}/100")
+                    if score >= 90:
+                        st.success(f"🟢 **{score}/100**")
+                    elif score >= 80:
+                        st.info(f"🟡 **{score}/100**")
+                    elif score >= 70:
+                        st.warning(f"🟠 **{score}/100**")
+                    else:
+                        st.error(f"🔴 **{score}/100**")
+                    st.write("**ATS Score**")
+                
                 with col2:
                     score_category = ats_data.get('score_category', 'Unknown')
-                    st.metric("Category", f"{score_category}")
+                    st.metric("Category", score_category)
+                
                 with col3:
                     match_level = "Strong" if score >= 80 else "Moderate" if score >= 70 else "Weak"
                     st.metric("Match Level", match_level)
+                
+                # Overall feedback
                 if score >= 90:
-                    st.success("Excellent! Your resume is highly likely to pass ATS screening.")
+                    st.success("🎉 **Excellent!** Your resume is highly likely to pass ATS screening.")
                 elif score >= 80:
-                    st.success("Good match! Minor improvements could make it even better.")
+                    st.success("✅ **Good match!** Minor improvements could make it even better.")
                 elif score >= 70:
-                    st.warning("Fair match. Some improvements needed to increase chances.")
+                    st.warning("⚠️ **Fair match.** Some improvements needed to increase chances.")
                 elif score >= 60:
-                    st.warning("Below average. Significant improvements recommended.")
+                    st.warning("🔄 **Below average.** Significant improvements recommended.")
                 else:
-                    st.error("Poor match. Major changes needed to improve ATS compatibility.")
-                st.subheader("Detailed ATS Analysis")
+                    st.error("❌ **Poor match.** Major changes needed to improve ATS compatibility.")
+                
+                # Detailed Analysis in organized sections
+                st.subheader("🔍 Detailed Analysis")
+                
+                # Keywords Analysis
                 col1, col2 = st.columns(2)
                 with col1:
-                    st.write("Matched Keywords:")
+                    st.markdown("### ✅ **Matched Keywords**")
                     matched_keywords = ats_data.get('matched_keywords', [])
                     if matched_keywords:
                         for keyword in matched_keywords:
-                            st.write(f"• {keyword}")
+                            st.success(f"✓ {keyword}")
                     else:
-                        st.write("No keywords matched")
+                        st.info("No keywords matched")
+                
                 with col2:
-                    st.write("Missing Keywords:")
+                    st.markdown("### ❌ **Missing Keywords**")
                     missing_keywords = ats_data.get('missing_keywords', [])
                     if missing_keywords:
                         for keyword in missing_keywords:
-                            st.write(f"• {keyword}")
+                            st.error(f"✗ {keyword}")
                     else:
-                        st.write("No missing keywords identified")
+                        st.success("No missing keywords identified")
+                
+                # Skills Gap Analysis
                 if ats_data.get('skills_gap'):
-                    st.write("Skills Gap Analysis:")
+                    st.markdown("### 🎯 **Skills Gap Analysis**")
+                    st.write("Consider developing these skills:")
                     for skill in ats_data.get('skills_gap', []):
-                        st.write(f"• {skill}")
-                if ats_data.get('experience_alignment'):
-                    st.write("Experience Alignment:")
-                    st.write(ats_data.get('experience_alignment', ''))
-                if ats_data.get('overall_assessment'):
-                    st.write("Overall Assessment:")
-                    st.write(ats_data.get('overall_assessment', ''))
-            except json.JSONDecodeError:
-                st.error("Error parsing ATS analysis. Raw output:")
-                st.code(ats_analysis)
+                        st.write(f"📚 {skill}")
+                
+                # Experience and Assessment
+                col1, col2 = st.columns(2)
+                with col1:
+                    if ats_data.get('experience_alignment'):
+                        st.markdown("### 💼 **Experience Alignment**")
+                        st.write(ats_data.get('experience_alignment', ''))
+                
+                with col2:
+                    if ats_data.get('overall_assessment'):
+                        st.markdown("### 📝 **Overall Assessment**")
+                        st.write(ats_data.get('overall_assessment', ''))
+                
+                # Recommendations
+                if ats_data.get('recommendations'):
+                    st.markdown("### 💡 **Recommendations**")
+                    recommendations = ats_data.get('recommendations', [])
+                    for i, rec in enumerate(recommendations, 1):
+                        st.write(f"{i}. {rec}")
+                
+                # Progress bar for score
+                st.subheader("📈 Score Breakdown")
+                progress_color = "green" if score >= 80 else "orange" if score >= 70 else "red"
+                st.progress(score / 100)
+                st.write(f"Your resume scored **{score} out of 100** points")
+            except json.JSONDecodeError as e:
+                st.error("⚠️ Error parsing ATS analysis. The AI response was not in valid JSON format.")
+                st.write("**Debug Information:**")
+                st.write(f"JSON Error: {str(e)}")
+                
+                # Show the raw response for debugging
+                with st.expander("View Raw AI Response", expanded=False):
+                    st.code(ats_analysis, language='text')
+                
+                # Try to extract useful information from the raw text
+                st.subheader("Extracted Information")
+                
+                # Look for score patterns
+                import re
+                score_patterns = [
+                    r"score[:\s]*(\d+)",
+                    r"(\d+)/100",
+                    r"(\d+)%",
+                    r"ATS[:\s]*(\d+)"
+                ]
+                
+                score_found = None
+                for pattern in score_patterns:
+                    matches = re.findall(pattern, ats_analysis, re.IGNORECASE)
+                    if matches:
+                        score_found = int(matches[0])
+                        break
+                
+                if score_found:
+                    st.metric("Estimated ATS Score", f"{score_found}/100")
+                    if score_found >= 80:
+                        st.success("Good match detected!")
+                    elif score_found >= 70:
+                        st.warning("Fair match detected.")
+                    else:
+                        st.error("Low match detected.")
+                
+                # Display the raw analysis text
+                st.subheader("Analysis Summary")
+                st.write(ats_analysis)
     else:
         st.info("Please upload a resume and enter a job description to calculate ATS score")
 

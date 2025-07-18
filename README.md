@@ -41,4 +41,4 @@ A web-based application that leverages large language models (LLMs) to analyze r
 - **Frontend**: Streamlit
 - **Backend**: Groq API with LLaMA 3 (OpenAI-compatible interface)
 - **PDF Parsing**: pdfplumber
-- **Language**: Python 3
+- **Language**: Python 3    

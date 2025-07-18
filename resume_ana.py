@@ -3,10 +3,6 @@ import pdfplumber
 from openai import OpenAI
 import os
 import json
-from dotenv import load_dotenv
-
-# Load environment variables
-load_dotenv()
 
 st.set_page_config(
     page_title="AI Resume Parser & ATS Analyzer", 
@@ -37,9 +33,10 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-if not GROQ_API_KEY:
-    st.error("❌ GROQ_API_KEY not found in environment variables. Please check your .env file.")
+try:
+    GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
+except KeyError:
+    st.error("❌ GROQ_API_KEY not found in Streamlit secrets. Please check your .streamlit/secrets.toml file.")
     st.stop()
 
 client = OpenAI(
